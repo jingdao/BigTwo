@@ -10,6 +10,7 @@ int previousCombination;
 int previousValue;
 int previousNumCards=-1;
 int currentCombination;
+int numPasses=0;
 
 int compCard (const void * c1, const void * c2) {
 	Card* a = *(Card**)c1;
@@ -20,7 +21,7 @@ int compCard (const void * c1, const void * c2) {
 	else return 1;
 }
 
-	int compareRanking(Card* cardsPlayed[],int numCardsPlayed) {
+	int getRanking(Card* cardsPlayed[],int numCardsPlayed) {
 		int rank=0;
 		if (numCardsPlayed==1) rank=cardsPlayed[0]->value*4+cardsPlayed[0]->suit;
 		else if (numCardsPlayed==2) {
@@ -48,7 +49,12 @@ int compCard (const void * c1, const void * c2) {
 				rank=cardsPlayed[0]->value;
 			}
 		}
-		if (rank>previousValue) {
+		return rank;
+	}
+
+	int compareRanking(Card* cardsPlayed[],int numCardsPlayed) {
+		int rank=getRanking(cardsPlayed,numCardsPlayed);
+		if (previousNumCards<=0||rank>previousValue) {
 			previousNumCards=numCardsPlayed;
 			previousValue=rank;
 			previousCombination=currentCombination;
@@ -205,8 +211,10 @@ void playCard(Card* hand[],int handSize,int playerId,int cardsPlayed[],int numCa
 			} else
 				hand[i-j]=hand[i];
 		}
+		numPasses=0;
 		printf("\n");
 	} else {
+		numPasses++;
 		printf("Pass\n");
 	}
 }
@@ -216,7 +224,7 @@ int getAction(Card* hand[],int handSize,int playerId,int displayFlag) {
 	int cardFlag;
 	char buffer[BUFFER_SIZE];
 	char* tok;
-	int numCardsPlayed=0;
+	int numCardsPlayed=0,i;
 	Card* cardsPlayed[5] = {NULL,NULL,NULL,NULL};
 	if (displayFlag) {
 		while (1) {
@@ -225,7 +233,7 @@ int getAction(Card* hand[],int handSize,int playerId,int displayFlag) {
 			displayCard(hand,handSize);
 			printf("    >>");
 			fgets(buffer,BUFFER_SIZE,stdin);
-			if (buffer[0]=='0') break;
+			if (buffer[0]=='0'&&previousNumCards>0) break;
 //			printf("\033[A\033[2K"); //cursor up; clear line
 			tok=strtok(buffer," ");
 			while (tok&&numCardsPlayed<5) {
@@ -242,6 +250,24 @@ int getAction(Card* hand[],int handSize,int playerId,int displayFlag) {
 				tok=strtok(NULL," ");
 			}
 			if (validate(cardsPlayed,numCardsPlayed)&&compareRanking(cardsPlayed,numCardsPlayed)) break;
+		}
+	} else {
+		displayCard(hand,handSize);
+		printf("\n");
+		if (previousNumCards<=0) {
+			compareRanking(&hand[0],1);
+			numCardsPlayed=1;
+			cardsPlayed[0]=hand[0];
+			cardsPlayedIndex[0]=0;
+		} else if (previousNumCards==1) {
+			for (i=0;i<handSize;i++) {
+				if (compareRanking(&hand[i],1)) {
+					numCardsPlayed=1;
+					cardsPlayed[0]=hand[i];
+					cardsPlayedIndex[0]=i;
+					break;
+				}
+			}
 		}
 	}
 	playCard(hand,handSize,playerId,cardsPlayedIndex,numCardsPlayed);
@@ -276,7 +302,12 @@ void newGame(Card deck[]) {
 		}
 	}
 	while (1) {
-		handSize[i]=getAction(playerCards[i],handSize[i],i+1,/*i==0*/1);
+		if (numPasses==3) {
+			printf("Player %d leads.\n",i+1);
+			numPasses=0;
+			previousNumCards=-1;
+		}
+		handSize[i]=getAction(playerCards[i],handSize[i],i+1,/*i==*/0);
 		if (handSize[i]==0) {
 			printf("Player %d won!\n",i+1);
 			break;
