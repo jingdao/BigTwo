@@ -11,6 +11,7 @@ int previousValue;
 int previousNumCards=-1;
 int currentCombination;
 int numPasses=0;
+int startingHand;
 
 int compCard (const void * c1, const void * c2) {
 	Card* a = *(Card**)c1;
@@ -18,6 +19,13 @@ int compCard (const void * c1, const void * c2) {
 	if (a->value<b->value) return -1;
 	else if (a->value>b->value) return 1;
 	else if (a->suit<b->suit) return -1;
+	else return 1;
+}
+
+int compInt (const void * c1, const void * c2) {
+	int a = *(int*)c1;
+	int b = *(int*)c2;
+	if (a<b) return -1;
 	else return 1;
 }
 
@@ -64,6 +72,14 @@ int compCard (const void * c1, const void * c2) {
 
 	int validate(Card* cardsPlayed[],int numCardsPlayed) {
 		if(previousNumCards>0&&numCardsPlayed!=previousNumCards) return 0;
+		//starting hand must contain 3 diamonds
+		if (startingHand) {
+			int i;
+			for (i=0;i<numCardsPlayed;i++) {
+				if (cardsPlayed[i]->value==3&&cardsPlayed[i]->suit==DIAMONDS) break;
+			}
+			if (i==numCardsPlayed) return 0;
+		}
 		if (numCardsPlayed<=0) return 0;
 		else if (numCardsPlayed==1) return 1;
 		else if (numCardsPlayed==2) {
@@ -205,6 +221,7 @@ void playCard(Card* hand[],int handSize,int playerId,int cardsPlayed[],int numCa
 			displayCard(&hand[cardsPlayed[i]],1);
 		}
 		//fix card order
+		qsort(cardsPlayed,numCardsPlayed,sizeof(int),compInt);
 		for (i=0;i<handSize;i++) {
 			if (j<numCardsPlayed&&i==cardsPlayed[j]) {
 				j++;
@@ -224,8 +241,8 @@ int getAction(Card* hand[],int handSize,int playerId,int displayFlag) {
 	int cardFlag;
 	char buffer[BUFFER_SIZE];
 	char* tok;
-	int numCardsPlayed=0,i;
-	Card* cardsPlayed[5] = {NULL,NULL,NULL,NULL};
+	int numCardsPlayed=0,i,j;
+	Card* cardsPlayed[5] = {NULL,NULL,NULL,NULL,NULL};
 	if (displayFlag) {
 		while (1) {
 			numCardsPlayed=0;
@@ -268,6 +285,21 @@ int getAction(Card* hand[],int handSize,int playerId,int displayFlag) {
 					break;
 				}
 			}
+		} else if (previousNumCards<5) {
+			for (i=0;i<handSize+1-previousNumCards;i++) {
+				for (j=1;j<previousNumCards;j++) {
+					if (hand[i]->value!=hand[i+j]->value) break;
+				}
+				if (j==previousNumCards&&compareRanking(&hand[i],previousNumCards)) {
+					numCardsPlayed=previousNumCards;
+					for (j=0;j<previousNumCards;j++) {
+						cardsPlayed[j]=hand[i+j];
+						cardsPlayedIndex[j]=i+j;
+					}
+					break;
+				}
+				i+=j-1;
+			}
 		}
 	}
 	playCard(hand,handSize,playerId,cardsPlayedIndex,numCardsPlayed);
@@ -291,6 +323,7 @@ void newGame(Card deck[]) {
 //	displayCard(p3,13);printf("\n");
 //	displayCard(p4,13);printf("\n");
 	//determine starting player (3 diamonds)
+	startingHand=1;
 	int i;
 	for (i=0;i<4;i++) {
 		if (playerCards[i][0]==&deck[0]) {
@@ -301,13 +334,16 @@ void newGame(Card deck[]) {
 			break;
 		}
 	}
+	handSize[i]=getAction(playerCards[i],handSize[i],i+1,i==0);
+	i=(i+1)%4;
+	startingHand=0;
 	while (1) {
 		if (numPasses==3) {
 			printf("Player %d leads.\n",i+1);
 			numPasses=0;
 			previousNumCards=-1;
 		}
-		handSize[i]=getAction(playerCards[i],handSize[i],i+1,/*i==*/0);
+		handSize[i]=getAction(playerCards[i],handSize[i],i+1,i==0);
 		if (handSize[i]==0) {
 			printf("Player %d won!\n",i+1);
 			break;
